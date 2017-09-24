@@ -1,0 +1,39 @@
+[dnstap]
+default_responder = 'Google'
+default_responder_64 = 'Google'
+query_response = true
+enabled_responders = ['Google', 'Umbrella']
+enabled_responders_64 = ['Google']
+dns_host = '127.0.0.1'
+dns_port = 53530
+
+
+
+[dns_providers.google]
+name = 'Google'
+dns_servers = ['8.8.8.8', '8.8.4.4']
+dns_servers_64 = ['2001:4860:4860:0:0:0:0:8888', '2001:4860:4860:0:0:0:0:8844']
+
+[dns_providers.umbrella]
+name = 'Umbrella'
+dns_servers = ['208.67.220.220', '208.67.222.222']
+
+[dns_providers.random]
+name = 'Random'
+dns_servers = ['172.22.216.251',]
+dns_servers_64 = ['2a01:4f0:400c:1:0:0:0:1',]
+
+[subscribers.dnstap]
+name = 'dnstap'
+broker_uri = "redis://127.0.0.1:6379"
+broker_uri = 'dnstap-investigate'
+
+[publishers.dnstap-results]
+name = 'dnstap-results'
+broker_uri = "redis://127.0.0.1:6379"
+broker_queue = 'dnstap-results'
+
+
+
+
+
