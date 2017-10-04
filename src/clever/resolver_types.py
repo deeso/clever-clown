@@ -1,18 +1,10 @@
 from .safebrowsing import SafeBrowsing
 import logging
 import socket
-import dnslib
-
-RESOVLER_TYPE_MAP = {}
-
-UDP = 'UDP'
-TCP = 'TCP'
-DNS = 'DNS'
-EDNS = 'EDNS0TLV'
-TRANSPORT = ['sport', 'dport', 'len']
+import dns.resolver
 
 
-class DnsServicev4(object):
+class DnsService(object):
     TYPE = "dnsservicev4"
 
     def __init__(self, name=None, server_address=None,
@@ -22,113 +14,127 @@ class DnsServicev4(object):
         self.server_port = server_port
         self.sbl = safe_browsing
 
+    def perform_query(self, qname, rdtype, qproto='udp'):
+        return self.resolver.resolve(qname, rdtype, tcp=(qproto == 'tcp'))
+
+    @classmethod
+    def process_easyway(cls, answers):
+        response = {'questions': [], 'answers': [], 'additionals': [],
+                    'rips': [], 'rnames':  [], 'qips': [], 'qnames': [],
+                    'raips': [], 'ranames': []}
+        lines = [i.strip() for i in str(answers.response).splitlines()]
+        processing_question = False
+        processing_answers = False
+        processing_additional = False
+        for line in lines:
+            if line.find('id ') == 0:
+                response['id'] = int(line.split()[1])
+                continue
+            elif line.find('opcode ') == 0:
+                response['opcode'] = line.split()[1]
+                continue
+            elif line.find('flags ') == 0:
+                response['flags'] = line.split()[1:]
+                continue
+            elif line.find(';QUESTION') == 0:
+                processing_question = True
+                continue
+            elif line.find(';ANSWER') == 0:
+                processing_question = False
+                processing_answers = True
+                continue
+            elif line.find(';ADDITIONAL') == 0:
+                processing_answers = False
+                processing_additional = True
+                continue
+
+            if processing_question:
+                elements = line.split()
+                # FIXME bad comparison here
+                if elements[0].find('ip6.arpa.') > 0 and\
+                   elements[-1] == 'PTR':
+                    elements[0] = cls.convert_v6(elements[0])
+                    response['qips'].append(elements[0])
+                elif elements[0].find('.in-addr.arpa') > 0 and \
+                     elements[-1] == 'PTR':
+                    elements[0] = cls.convert_v4(elements[0])
+                    response['qips'].append(elements[0])
+                else:
+                    response['qips'].append(elements[0].strip('.'))
+                response['questions'].append(elements)
+            if processing_answers:
+                elements = line.split()
+                # FIXME bad comparison here
+                if elements[0].find('ip6.arpa.') > 0 and\
+                   elements[-1] == 'PTR':
+                    elements[0] = cls.convert_v6(elements[0])
+                    response['rips'].append(elements[0])
+                elif elements[0].find('.in-addr.arpa') > 0 and \
+                     elements[-1] == 'PTR':
+                    elements[0] = cls.convert_v4(elements[0])
+                    response['rips'].append(elements[0])
+                else:
+                    response['rnames'].append(elements[0].strip('.'))
+                response['answers'].append(elements)
+            if processing_additional:
+                elements = line.split()
+                # FIXME bad comparison here
+                if elements[0].find('ip6.arpa.') > 0 and\
+                   elements[-1] == 'PTR':
+                    elements[0] = cls.convert_v6(elements[0])
+                    response['raips'].append(elements[0])
+                elif elements[0].find('.in-addr.arpa') > 0 and \
+                   elements[-1] == 'PTR':
+                    elements[0] = cls.convert_v4(elements[0])
+                    response['raips'].append(elements[0])
+                else:
+                    response['ranames'].append(elements[0].strip('.'))
+                response['additionals'].append(elements)
+        return results
+
+    @classmethod
+    def convert_v4(self, ip4_reverse):
+        ip4 = ip4_reverse.split('.in-addr.arpa')[0].split('.')[::-1]
+        return ".".join(ip4)
+
+    @classmethod
+    def convert_v6(self, ip6_reverse):
+        ip6 = ip6_reverse.split('ip6.arpa.')[0].replace('.', '')[::-1]
+        pos = 0
+        v = []
+        while pos < len(ip6):
+            v.append(ip6[pos:pos+4])
+            pos += 4
+        return ":".join(v)
+
+    def handle_client_request_udp(self, req_data):
+        query = dns.message.from_wire(req_data)
+        answers = dns.query.udp(query, self.server_address,
+                                port=self.server_port)
+        results = self.process_easyway(answers)
+        results['query_server'] = self.server_address
+        results['query_port'] = self.server_port
+        return results, answers
+
+    def handle_client_request_tcp(self, req_data):
+        query = dns.message.from_wire(req_data)
+        answers = dns.query.tcp(query, self.server_address,
+                                port=self.server_port)
+        results = self.process_easyway(answers)
+        results['query_server'] = self.server_address
+        results['query_port'] = self.server_port
+        return results, answers
+
+    def handle_publisher_request(self, qname, rdtype, qproto='udp'):
+        answers = self.resolver.resolve(qname, rdtype, tcp=(qproto == 'tcp'))
+        results = self.process_easyway(answers)
+        results['query_server'] = self.server_address
+        results['query_port'] = self.server_port
+        return results, answers
+
     def check_domains(self, domains):
         results = {}
-        _safe_domains = sbl.handle_domains(domains)
+        _safe_domains = self.sbl.handle_domains(domains)
         for k, v in _safe_domains.items():
             results[k] = 'safe_domain' if v else 'unsafe_domain'
         return results
-
-    def is_edns(self, data):
-        try:
-            dnslib.DNSRecord.parse(data)
-            return False
-        except:
-            return True
-
-    def handle(self, req_data, traffic_type):
-        dns_etl_data = self.serialize_dns(req_data, prepend='req')
-        dns_etl_data['req_len'] = len(req_data)
-        dns_etl_data['req_type'] = 'dns' if self.is_edns(req_data) else 'edns'
-
-        rsp_data = self.send_request(req_data, traffic_type)
-        rsp_etl_data = self.serialize_dns(rsp_data, prepend='rsp')
-        rsp_etl_data['rsp_len'] = len(rsp_data)
-        dns_etl_data.update(rsp_etl_data)
-        hosts = [i['qname'].strip('.') for i in dns_etl_data['req_questions'] if 'qname' in i]
-        hosts = hosts + \
-                [i['rname'].strip('.') for i in dns_etl_data['rsp_responses'] if 'rname' in i]
-        return rsp_data, dns_etl_data
-
-    def send_request(self, req_data, traffic_type):
-        if traffic_type == 'udp':
-            return self.send_udp(req_data)
-        else:
-            return self.send_tcp(req_data)
-
-    def send_udp(self, packet_data):
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.sendto(packet_data, (self.server_address, self.server_port))
-        recv_data = s.recvfrom(8192)
-        return recv_data
-
-    def send_tcp(self, packet_data):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self.server_address, self.server_port))
-        data = sock.recv(8192)
-        if len(data) < 2:
-            raise Exception("Packet size too small")
-
-        sz = int(data[:2].encode('hex'), 16)
-
-        if sz > len(data) - 2:
-            while True:
-                if sz > len(data) - 2:
-                    tmp = sock.recv(sz-len(data)-2)
-                    if tmp == '':
-                        break
-                    data = data + tmp
-
-        if sz < len(data) - 2:
-            logging.debug("TCP packet under the specified size")
-            raise Exception("TCP packet under the specified size")
-        elif sz > len(data) - 2:
-            logging.debug("TCP packet over the specified size")
-            raise Exception("TCP packet over the specified size")
-        return data
-
-    def serialize_dns(self, data, prepend=''):
-        etl = {}
-        dns_req = dnslib.EDNS0.parse(data)
-
-        nkey = 'header' if prepend == '' else prepend+'_header'
-        etl[nkey] = {}
-        header = repr(dns_req.header).strip('<DNS Header: ').strip('>').strip()
-        for e in header.split():
-            k, v = e.strip().split('=')
-            etl[nkey][k] = v.replace("'", '')
-
-        nkey = 'questions' if prepend == '' else prepend+'_questions'
-        etl[nkey] = []
-        for question in dns_req.questions:
-            msg = {}
-            for k, v in question.__dict__.items():
-                msg[k.strip('_')] = str(v)
-            etl[nkey].append(msg)
-
-        nkey = 'responses' if prepend == '' else prepend+'_responses'
-        etl[nkey] = []
-        for response in dns_req.rr:
-            msg = {}
-            for k, v in response.__dict__.items():
-                msg[k.strip('_')] = str(v)
-            etl[nkey].append(msg)
-        return etl
-
-        nkey = 'ar' if prepend == '' else prepend+'_ar'
-        etl[nkey] = []
-        for response in dns_req.ar:
-            msg = {}
-            for k, v in response.__dict__.items():
-                msg[k.strip('_')] = str(v)
-            etl[nkey].append(msg)
-        return etl
-
-        nkey = 'auth' if prepend == '' else prepend+'_auth'
-        etl[nkey] = []
-        for response in dns_req.auth:
-            msg = {}
-            for k, v in response.__dict__.items():
-                msg[k.strip('_')] = str(v)
-            etl[nkey].append(msg)
-        return etl

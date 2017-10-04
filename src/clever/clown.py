@@ -1,6 +1,6 @@
 from kombu import Connection
 from .resolver_types import RESOVLER_TYPE_MAP
-from .resolver_types import DnsServicev4
+from .resolver_types import DnsService
 
 import toml
 import os
@@ -20,14 +20,67 @@ class ClownFactory(object):
             raise
         config_dict = toml.load(config_file)
 
-    @classmethod
-    def contains_valid_blocks(cls, config_dict):
+        return Clown()
 
+    @classmethod
+    def parse_dnstap_block(cls, config_dict):
+
+
+
+class ClownService(object):
+    DEFAULT_NAME = 'clever-clown'
+    DEFAULT_RESOLVER = 'Google'
+    DEFAULT_HOST='0.0.0.0'
+    DEFAULT_PORT=53530
+
+    DEFAULT_RESOLVER = 'Google'
+    GV6 = '2001:4860:4860:0:0:0:0:8888'
+    GV4 = '8.8.8.8'
+    RESOLVERS = {DEFAULT_RESOLVER: DnsService(DEFAULT_RESOLVER, GV4)}
+    RESOLVERS_64 = {DEFAULT_RESOLVER: DnsServicev6(DEFAULT_RESOLVER, GV6)}
+
+    def __init__(self, name=DEFAULT_NAME, default_responder=DEFAULT_RESOLVER,
+                 default_responder_64=DEFAULT_RESOLVER, query_response=False,
+                 enabled_responders=[DEFAULT_RESOLVER, ],
+                 enabled_responders_64=[DEFAULT_RESOLVER, ],
+                 dns_host=DEFAULT_PORT, dns_port=DEFAULT_HOST,
+                 dns_providers={}, publishers={}, subscripers={},
+                 query_limit_per_pub=10):
+
+        self.dns_host = dns_host
+        self.dns_port = dns_port
+
+        self.subscripers = subscripers
+        self.publishers = publishers
+
+        self.enabled_responders = enabled_responders
+        if len(enabled_responders) == 0:
+            self.enabled_responders.append(DEFAULT_RESOLVER)
+
+        self.enabled_responders_64 = enabled_responders
+        if len(enabled_responders_64) == 0:
+            self.enabled_responders_64.append(DEFAULT_RESOLVER)
+
+        self.tcpclown = TCPClown(listen_port=dns_port, listen_host=dns_host)
+        self.udpclown = UDPClown(listen_port=dns_port, listen_host=dns_host)
+        self.query_limit_per_pub = query_limit_per_pub
+
+    def resovle
+
+    def consumer_callback(self, pub, msg):
+        if 'domains' in msg:
+            for d in msg['domains']:
+                self.udpclown.resolve
+
+    def consume(self):
+
+        for name, publisher in self.publisher.items():
+            queries = publisher.recv_messages(cnt=self.query_limit_per_pub)
 
 
 class Clown(SocketServer.BaseRequestHandler):
     DEFAULT_RESOLVER = 'Google'
-    RESOLVERS = {'Google': DnsServicev4('google', '8.8.8.8')}
+    RESOLVERS = {'Google': DnsService('google', '8.8.8.8')}
     LISTEN_PORT = 5454
     STORE_URI = "redis://127.0.0.1:6379"
     STORE_QUEUE = "clever-clown-results"

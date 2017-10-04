@@ -14,8 +14,8 @@ rm -r $VIRTUAL_ENV/dist-packages/$PMOD-1.0-py2.7.egg \
       $PROJECT/dist/ \
       $PROJECT/build/
 
-#rm -r $VIRTUAL_ENV
-#virtualenv -p /usr/bin/python2.7 $VIRTUAL_ENV
+rm -r $VIRTUAL_ENV
+virtualenv -p /usr/bin/python2.7 $VIRTUAL_ENV
 $PYTHON $PROJECT_BASE/$SPOJ/setup.py install
 $PYTHON setup.py install
 

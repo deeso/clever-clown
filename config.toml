@@ -1,4 +1,5 @@
 [dnstap]
+name = "dnstap-00"
 default_responder = 'Google'
 default_responder_64 = 'Google'
 query_response = true
@@ -6,6 +7,7 @@ enabled_responders = ['Google', 'Umbrella']
 enabled_responders_64 = ['Google']
 dns_host = '127.0.0.1'
 dns_port = 53530
+query_limit_per_pub=20
 
 
 
