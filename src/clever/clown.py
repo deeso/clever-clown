@@ -7,6 +7,7 @@ import os
 import SocketServer
 import logging
 
+
 class ClownFactory(object):
 
     REQUIRED_BLOCKS = ['dnstap', 'dnsproviders']
@@ -18,13 +19,19 @@ class ClownFactory(object):
             os.stat(config_file)
         except:
             raise
+
         config_dict = toml.load(config_file)
+        # TODO parse the dnstap configs
 
-        return Clown()
+        # TODO parse the subscribers and publishers
 
-    @classmethod
-    def parse_dnstap_block(cls, config_dict):
+        # TODO parse the DNS providers
 
+        # TODO parse the logging setup
+
+        # TODO create the clever-clown service
+
+        return ClownService()
 
 
 class ClownService(object):
@@ -65,18 +72,27 @@ class ClownService(object):
         self.udpclown = UDPClown(listen_port=dns_port, listen_host=dns_host)
         self.query_limit_per_pub = query_limit_per_pub
 
-    def resovle
-
     def consumer_callback(self, pub, msg):
+        # TODO extract the domain name or IP address to look up
+
+        # TODO For each DNS service process the domain and save the results
         if 'domains' in msg:
             for d in msg['domains']:
-                self.udpclown.resolve
+                pass
 
     def consume(self):
-
+        # TODO iterate through all of the publishers and pull off N messages
+        # and process them with the callback
+        query_results = {}
         for name, publisher in self.publisher.items():
-            queries = publisher.recv_messages(cnt=self.query_limit_per_pub)
+            queries = publisher.recv_messages(cnt=self.query_limit_per_pub,
+                                              callback=self.consumer_callback)
+            query_results[name] = queries
+        return query_results
 
+    def publish(self, results):
+        # TODO publish query results to all relevant subscribers
+        pass
 
 class Clown(SocketServer.BaseRequestHandler):
     DEFAULT_RESOLVER = 'Google'
