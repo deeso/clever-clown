@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
-from setuptools.command.install import install
-import sys
 # configure the setup to install from specific repos and users
 
 DEPENDENCY_LINKS = [
@@ -14,7 +12,9 @@ setup(name='clever-clown',
       description=DESC,
       author='adam pridgen',
       author_email='dso@thecoverofnight.com',
-      install_requires=['toml', 'redis', 'kombu', 'spoton-johny', 'dnspython', 'googlesafebrowsing'],
+      install_requires=['toml', 'redis', 'kombu', 'markerlib',
+                        'distribute', 'spoton-johny', 'dnspython',
+                        'gglsbl'],
       packages=find_packages('src'),
       package_dir={'': 'src'},
       dependency_links=DEPENDENCY_LINKS,
