@@ -4,7 +4,7 @@ from .resolver_types import DnsService
 
 import toml
 import os
-import SocketServer
+import socketserver
 import logging
 
 
@@ -84,7 +84,7 @@ class ClownService(object):
         # TODO iterate through all of the publishers and pull off N messages
         # and process them with the callback
         query_results = {}
-        for name, publisher in self.publisher.items():
+        for name, publisher in list(self.publisher.items()):
             queries = publisher.recv_messages(cnt=self.query_limit_per_pub,
                                               callback=self.consumer_callback)
             query_results[name] = queries
@@ -94,7 +94,7 @@ class ClownService(object):
         # TODO publish query results to all relevant subscribers
         pass
 
-class Clown(SocketServer.BaseRequestHandler):
+class Clown(socketserver.BaseRequestHandler):
     DEFAULT_RESOLVER = 'Google'
     RESOLVERS = {'Google': DnsService('google', '8.8.8.8')}
     LISTEN_PORT = 5454
@@ -129,7 +129,7 @@ class Clown(SocketServer.BaseRequestHandler):
             cls.RESOLVERS[name] = r
 
         if cls.DEFAULT_RESOLVER not in cls.RESOLVERS:
-            n = cls.RESOLVERS.keys()[0]
+            n = list(cls.RESOLVERS.keys())[0]
             cls.DEFAULT_RESOLVER = n
 
     def handle(self):
@@ -160,9 +160,9 @@ class Clown(SocketServer.BaseRequestHandler):
 
     def response_etl(self, responses):
         etl = {}
-        for name, response in responses.items():
+        for name, response in list(responses.items()):
             response_json = response.to_json()
-            for k, v in response_json.items():
+            for k, v in list(response_json.items()):
                 etl_key = '%s_%s' % (name, k)
                 etl[etl_key] = v
         return etl

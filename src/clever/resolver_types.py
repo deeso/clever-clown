@@ -135,6 +135,6 @@ class DnsService(object):
     def check_domains(self, domains):
         results = {}
         _safe_domains = self.sbl.handle_domains(domains)
-        for k, v in _safe_domains.items():
+        for k, v in list(_safe_domains.items()):
             results[k] = 'safe_domain' if v else 'unsafe_domain'
         return results

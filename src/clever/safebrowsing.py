@@ -1,5 +1,5 @@
 from gglsbl import SafeBrowsingList
-from urlparse import urlparse
+from urllib.parse import urlparse
 import os
 
 

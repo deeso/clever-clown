@@ -166,7 +166,7 @@ def get_basic_message(domain_name, query_type='A', qid=None):
         return None
     qname = dns.name.from_text(domain_name)
     q = dns.message.make_query(qname, RECORD_TYPES.get(query_type))
-    if isinstance(qid, int) or isinstance(qid, long):
+    if isinstance(qid, int) or isinstance(qid, int):
         q.id = qid
     return q
 
